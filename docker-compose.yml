@@ -13,7 +13,7 @@ services:
     secrets:
       - "transip_private_key"
     environment:
-      - "TRANSIP_ACCOUNT_NAME=skardoska"
+      - "TRANSIP_ACCOUNT_NAME="
       - "TRANSIP_PRIVATE_KEY_PATH=/run/secrets/transip_private_key"
     command:
       #- "--log.level=DEBUG"
@@ -22,11 +22,12 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
+     # - "--entrypoints.mc.address=217.182.216.255:25663/tcp"
       - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
      # - "--certificatesresolvers.myresolver.acme.acmelogging=true"
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=transip"
      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-      - "--certificatesresolvers.myresolver.acme.email=mail@koenjanssen.xyz"
+      - "--certificatesresolvers.myresolver.acme.email="
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
       - "traefik.frontend.headers.SSLRedirect=true"
@@ -49,7 +50,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=http"
       - "traefik.http.routers.traefik.rule=Host(`traefik.koen.link`)"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=*****************"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=test:pwdhere"
       - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
       - "traefik.http.routers.traefik-secure.entrypoints=https"
@@ -57,32 +58,67 @@ services:
       - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
       - "traefik.http.routers.traefik-secure.tls=true"
       - "traefik.http.routers.traefik-secure.tls.certresolver=myresolver"
-      - "traefik.http.routers.traefik-secure.tls.domains[0].main=koen.link"
-      - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.koen.link"
+      #- "traefik.http.routers.traefik-secure.tls.domains[0].main=koen.link"
+      #- "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.koen.link"
       - "traefik.http.routers.traefik-secure.service=api@internal"
-  
-  nginx_portfolio:
-    image: "nginx"
-    container_name: "portfolio"
+      #- "traefik.http.routers.traefik-secure.entrypoints=mc"
+
+  phpmyadmin:
+    image: "phpmyadmin/phpmyadmin"
+    container_name: "phpmyadmin"
     restart: unless-stopped
-#    environment:
-    #  - NGINX_HOST=web.koen.link
-     # - NGINX_PORT=80
     volumes:
-      - /srv/www/portfolio/html:/usr/share/nginx/html:z
+      - /etc/localtime:/etc/localtime
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.portfolio.compress=true"
-      - "traefik.http.routers.portfolio.entrypoints=http"
-      - "traefik.http.routers.portfolio.rule=Host(`koen.link`)"
-      - "traefik.http.middlewares.portfolio-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.portfolio.middlewares=portfolio-https-redirect"
-      - "traefik.http.routers.portfolio-secure.entrypoints=https"
-      - "traefik.http.routers.portfolio-secure.rule=Host(`koen.link`)"
-      - "traefik.http.routers.portfolio-secure.tls=true"
-      - "traefik.http.routers.portfolio-secure.tls.certresolver=myresolver"
-      #- "traefik.http.routers.portfolio-secure.tls.options..minVersion=VersionTLS12"
- 
+      - "traefik.http.middlewares.phpmyadmin.compress=true"
+      - "traefik.http.routers.phpmyadmin.entrypoints=http"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`pma.koen.link`)"
+      - "traefik.http.middlewares.phpmyadmin-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.phpmyadmin.middlewares=phpmyadmin-https-redirect"
+      - "traefik.http.routers.phpmyadmin-secure.entrypoints=https"
+      - "traefik.http.routers.phpmyadmin-secure.rule=Host(`pma.koen.link`)"
+      - "traefik.http.routers.phpmyadmin-secure.tls=true"
+      - "traefik.http.routers.phpmyadmin-secure.tls.certresolver=myresolver"
+      #- "traefik.http.routers.phpmyadmin-secure.tls.options..minVersion=VersionTLS12"
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_USER=root
+      - PMA_PASSWORD=PASSWORDSNIPSNIP
+
+  mariadb:
+    image: "mariadb"
+    container_name: "mariadb"
+    restart: unless-stopped
+   # command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci --init-connect='SET NAMES UTF8;' --innodb-flush-log-at-trx-commit=0
+    ports:
+      - "3306:3306"
+    volumes:
+      - /srv/mariadb/config:/var/lib/mysql:rw
+     # - ./custom_mariadb/mariadb.cnf:/config/custom.cnf
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - MYSQL_ROOT_PASSWORD=PASSWORDSNIPSNIP
+      - TZ=Europe/Amsterdam
+      - MYSQL_DATABASE=mariadb
+      - MYSQL_USER=mariadb
+      - MYSQL_PASSWORD=PASSWORDSNIPSNIP
+    labels:
+      - "traefik.enable=true"
+
+
+  php:
+    image: "php:7.2-fpm"
+    container_name: "php"
+    expose:
+      - 9000
+    volumes:
+      - /srv/www/portfolio/html:/srv/www/portfolio/html:z
+      - /var/www/portfolio/php/php.ini:/usr/local/etc/php/php.ini
+    labels:
+      - "traefik.enable=true"
+
   nginx_portfolio_xyz:
     image: "nginx"
     container_name: "portfolio_xyz"
@@ -91,7 +127,11 @@ services:
     #  - NGINX_HOST=web.koen.link
      # - NGINX_PORT=80
     volumes:
-      - /srv/www/portfolio/html:/usr/share/nginx/html:z
+      - /srv/www/portfolio/html:/srv/www/portfolio/html:z
+      - /srv/www/portfolio/conf.d:/etc/nginx/conf.d
+      - /etc/localtime:/etc/localtime
+    depends_on:
+      - php
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portfolio_xyz.entrypoints=http"
@@ -110,52 +150,31 @@ services:
     container_name: "nc"
     restart: unless-stopped
     environment:
-     # - NEXTCLOUD_ADMIN_USER=koen
-     # - NEXTCLOUD_ADMIN_PASSWORD=*****************
-     # - NEXTCLOUD_TRUSTED_DOMAINS=nc.koen.link
-      - MYSQL_DATABASE=*****************
-      - MYSQL_USER=*****************
-      - MYSQL_PASSWORD=*****************
-      - MYSQL_HOST=*****************
-      #- POSTGRES_DB=*****************
-      #- POSTGRES_USER=*****************
-      #- POSTGRES_PASSWORD=*****************
-      #- POSTGRES_HOST=*****************
-      - REDIS_HOST=*****************
-      - REDIS_HOST_PORT=*****************
-      - REDIS_HOST_PASSWORD=*****************
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=PASSWORDSNIPSNIP
+      - MYSQL_HOST=nc_db:3306
     volumes:
       - /srv/nc/nextcloud:/var/www/html:rw
       - /srv/nc/apps:/var/www/html/custom_apps:rw
       - /srv/nc/config:/var/www/html/config:rw
       - /srv/nc/data:/var/www/html/data:rw
-      #- /srv/nc/apache2:/etc/apache2:rw
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
-      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
-      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
       - "traefik.http.routers.nc.entrypoints=http"
       - "traefik.http.routers.nc.rule=Host(`nc.koen.link`)"
       - "traefik.http.middlewares.nc-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.nc.middlewares=nc-https-redirect"
       - "traefik.http.routers.nc-secure.entrypoints=https"
       - "traefik.http.routers.nc-secure.rule=Host(`nc.koen.link`)"
-      - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker"
+      - "traefik.http.middlewares.nc-rep.redirectregex.regex=https://(.*)/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.nc-rep.redirectregex.replacement=https://$$1/remote.php/dav/"
+      - "traefik.http.middlewares.nc-rep.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nc-header.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.routers.nextcloud-secure.middlewares=nc-rep,nc-header"
       - "traefik.http.routers.nc-secure.tls=true"
       - "traefik.http.routers.nc-secure.tls.certresolver=myresolver"
-      #- "traefik.http.routers.nc.middlewares=nc@docker"
 
- # nc_db2:
- #   image: "postgres"
- #   restart: unless-stopped
- #   container_name: "nc_db2"
- ##     - "/srv/nc_postgres:/var/lib/postgresql/data/pgdata"
- #   environment:
- #     - POSTGRES_USER=postgres
- #     - POSTGRES_PASSWORD=*****************
- #     - PGDATA=/var/lib/postgresql/data/pgdata
-      
 
   nc_db:
     image: "mariadb"
@@ -164,56 +183,16 @@ services:
    # command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci --init-connect='SET NAMES UTF8;' --innodb-flush-log-at-trx-commit=0
     volumes:
       - /srv/nc_db/config:/var/lib/mysql:rw
-     # - ./custom_mariadb/mariadb.cnf:/config/custom.cnf
     environment:
       - PUID=1000
       - PGID=1000
-      - MYSQL_ROOT_PASSWORD=*****************
+      - MYSQL_ROOT_PASSWORD=PASSWORDSNIPSNIP
       - TZ=Europe/Amsterdam
-      - MYSQL_DATABASE=*****************
-      - MYSQL_USER=*****************
-      - MYSQL_PASSWORD=*****************
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=PASSWORDSNIPSNIP
     labels:
       - "traefik.enable=true"
-
-  redis:
-    image: "redis"
-    container_name: "nc_redis"
-    restart: unless-stopped
-    volumes:
-      - /srv/nc_redis/mysql:/var/lib/mysql:rw
-    environment:
-      - REDIS_PASSWORD=***************** redis sh -c 'exec redis-server --requirepass "$REDIS_PASSWORD"'
-    labels:
-      - "traefik.enable=true"
-
-  #gitlab:
-  #  image: "ulm0/gitlab"
-  #  container_name: "gitlab"
-  #  restart: unless-stopped
-  #  hostname: "gtl.koen.link"
-  #  environment:
-  #    GITLAB_OMNIBUS_CONFIG: |
-  #      external_url 'http://gtl.koen.link'
-  #      nginx['listen_port'] = 80  
-  #      # Add any other gitlab.rb configuration here, each on its own line
-  #  ports:
-  #    - "2222:22"
-  #  volumes:
-  #    - /srv/gitlab/config:/etc/gitlab:rw
-  #    - /srv/gitlab/logs:/var/log/gitlab:rw
-  #    - /srv/gitlab/data:/var/opt/gitlab:rw
-  #  labels:
-  #    - "traefik.enable=true"
-  #    - "traefik.http.routers.gitlab.entrypoints=http"
-  #    - "traefik.http.routers.gitlab.rule=Host(`gtl.koen.link`)"
-  #    - "traefik.http.middlewares.gitlab-https-redirect.redirectscheme.scheme=https"
-  #    - "traefik.http.routers.gitlab.middlewares=gitlab-https-redirect"
-  #   - "traefik.http.routers.gitlab-secure.entrypoints=https"
-  #    - "traefik.http.routers.gitlab-secure.rule=Host(`gtl.koen.link`)"
-  #    - "traefik.http.services.gitlab.loadbalancer.server.port=80"
-  #    - "traefik.http.routers.gitlab-secure.tls=true"
-  #    - "traefik.http.routers.gitlab-secure.tls.certresolver=myresolver"
 
 
   gitea-web:
@@ -224,7 +203,6 @@ services:
     expose:
       - "3000"
     ports:
-      #- "3080:3000"
       - "2222:22"
     depends_on:
       - gitea-db
@@ -241,24 +219,90 @@ services:
       - "traefik.http.routers.gitea-secure.tls.certresolver=myresolver"
     environment:
       - USER_UID=1000
-      - USER_GID=1000   
+      - USER_GID=1000
       - DB_TYPE=mysql
-      - DB_HOST=*****************
-      - DB_NAME=*****************
-      - DB_USER=*****************
-      - DB_PASSWD=*****************
+      - DB_HOST=gitea-db
+      - DB_NAME=gitea
+      - DB_USER=gitea
+      - DB_PASSWD=PASSWORDSNIPSNIP
       - HTTP_PORT=3000
-   
+
   gitea-db:
     image: mariadb:10
     restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=*****************
+      - MYSQL_ROOT_PASSWORD=PASSWORDSNIPSNIP
       - MYSQL_DATABASE=gitea
       - MYSQL_USER=gitea
-      - MYSQL_PASSWORD=*****************
+      - MYSQL_PASSWORD=PASSWORDSNIPSNIP
     volumes:
       - /srv/gitea/db/:/var/lib/mysql
     labels:
       - "traefik.enable=true"
 
+  s2wad:
+    image: "nginx"
+    container_name: "s2wad"
+    restart: unless-stopped
+    volumes:
+      - /srv/www/S2_WAD/html:/srv/www/S2_WAD/html
+      - /srv/www/S2_WAD/conf.d:/etc/nginx/conf.d
+      - /etc/localtime:/etc/localtime
+    depends_on:
+      - s2wad-php
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.s2wad.compress=true"
+      - "traefik.http.routers.s2wad.entrypoints=http"
+      - "traefik.http.routers.s2wad.rule=Host(`s2wad.koen.link`)"
+      - "traefik.http.middlewares.s2wad-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.s2wad.middlewares=s2wad-https-redirect"
+      - "traefik.http.routers.s2wad-secure.entrypoints=https"
+      - "traefik.http.routers.s2wad-secure.rule=Host(`s2wad.koen.link`)"
+      - "traefik.http.routers.s2wad-secure.tls=true"
+      - "traefik.http.routers.s2wad-secure.tls.certresolver=myresolver"
+
+  s2wad-php:
+    image: "php:8.0.2-fpm"
+    container_name: "s2wad-php"
+    expose:
+      - 9000
+    volumes:
+      - /srv/www/S2_WAD/html:/srv/www/S2_WAD/html
+      - /var/www/S2_WAD/php/php.ini:/usr/local/etc/php/php.ini
+    labels:
+      - "traefik.enable=true"
+
+
+  s2prj:
+    image: "nginx"
+    container_name: "s2prj"
+    restart: unless-stopped
+    volumes:
+      - /srv/www/S2_PRJ/html:/srv/www/S2_PRJ/html
+      - /srv/www/S2_PRJ/conf.d:/etc/nginx/conf.d
+      - /etc/localtime:/etc/localtime
+    depends_on:
+      - s2prj-php
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.s2prj.compress=true"
+      - "traefik.http.routers.s2prj.entrypoints=http"
+      - "traefik.http.routers.s2prj.rule=Host(`s2prj.koen.link`)"
+      - "traefik.http.middlewares.s2prj-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.s2prj.middlewares=s2wad-https-redirect"
+      - "traefik.http.routers.s2prj-secure.entrypoints=https"
+      - "traefik.http.routers.s2prj-secure.rule=Host(`s2prj.koen.link`)"
+      - "traefik.http.routers.s2prj-secure.tls=true"
+      - "traefik.http.routers.s2prj-secure.tls.certresolver=myresolver"
+
+  s2prj-php:
+    image: "php:8.0.2-fpm"
+    container_name: "s2prj-php"
+    expose:
+      - 9000
+    volumes:
+      - /srv/www/S2_PRJ/html:/srv/www/S2_PRJ/html
+      - /var/www/S2_PRJ/php/php.ini:/usr/local/etc/php/php.ini
+    labels:
+      - "traefik.enable=true"
